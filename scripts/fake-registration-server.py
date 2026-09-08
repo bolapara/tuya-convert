@@ -24,7 +24,10 @@ def exit_cleanly(signal, frame):
 
 signal.signal(signal.SIGINT, exit_cleanly)
 
-from Cryptodome.Cipher import AES
+try:
+	from Cryptodome.Cipher import AES
+except ImportError:  # some distributions package pycryptodome as "Crypto"
+	from Crypto.Cipher import AES
 pad = lambda s: s + (16 - len(s) % 16) * chr(16 - len(s) % 16)
 unpad = lambda s: s[:-ord(s[len(s) - 1:])]
 encrypt = lambda msg, key: AES.new(key, AES.MODE_ECB).encrypt(pad(msg).encode())

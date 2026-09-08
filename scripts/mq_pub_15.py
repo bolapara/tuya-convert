@@ -18,7 +18,10 @@ help_message = '''USAGE:
 iot:	
 %s -i 43511212112233445566 -l a1b2c3d4e5f67788''' % (sys.argv[0].split("/")[-1])
 
-from Cryptodome.Cipher import AES
+try:
+	from Cryptodome.Cipher import AES
+except ImportError:  # some distributions package pycryptodome as "Crypto"
+	from Crypto.Cipher import AES
 pad = lambda s: s + (16 - len(s) % 16) * chr(16 - len(s) % 16)
 unpad = lambda s: s[:-ord(s[len(s) - 1:])]
 encrypt = lambda msg, key: AES.new(key, AES.MODE_ECB).encrypt(pad(msg).encode())

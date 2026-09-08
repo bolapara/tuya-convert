@@ -6,7 +6,7 @@
 version_check () {
 	echo "System info"
 	echo "==========="
-	git rev-parse --short HEAD
+	git rev-parse --short HEAD 2>/dev/null || echo "(source tarball, no git revision)"
 	uname -a
 	openssl version
 	dnsmasq --version
@@ -24,13 +24,22 @@ setup () {
 		sudo kill $wpa_supplicant_pid
 	fi
 
+	# Rather than stopping NetworkManager outright -- which also tears down any
+	# wired connection, often the machine's only route to the internet -- hand
+	# just the wireless interface over to hostapd. Fall back to stopping the
+	# service where nmcli is unavailable or refuses.
 	if test -d /etc/NetworkManager; then
-		echo "Stopping NetworkManager..."
-		if ! sudo systemctl stop network-manager 2>/dev/null
-		then
-			if ! sudo systemctl stop NetworkManager 2>/dev/null
+		if command -v nmcli >/dev/null && sudo nmcli device set "$WLAN" managed no 2>/dev/null; then
+			echo "Released $WLAN from NetworkManager (other connections stay up)"
+			sleep 1
+		else
+			echo "Stopping NetworkManager..."
+			if ! sudo systemctl stop network-manager 2>/dev/null
 			then
-				echo "** Failed to stop NetworkManager, AP may not work! **"
+				if ! sudo systemctl stop NetworkManager 2>/dev/null
+				then
+					echo "** Failed to stop NetworkManager, AP may not work! **"
+				fi
 			fi
 		fi
 	fi
@@ -66,13 +75,20 @@ cleanup () {
 	echo "Stopping DNSMASQ server..."
 	sudo pkill dnsmasq
 
+	# Give the wireless interface back and clear the static AP address, so
+	# normal WiFi works again after flashing.
 	if test -d /etc/NetworkManager; then
-		echo "Restarting NetworkManager..."
-		if ! sudo systemctl restart network-manager 2>/dev/null
-		then
-			if ! sudo systemctl restart NetworkManager 2>/dev/null
+		sudo ip addr flush dev "$WLAN" 2>/dev/null
+		if command -v nmcli >/dev/null && sudo nmcli device set "$WLAN" managed yes 2>/dev/null; then
+			echo "Returned $WLAN to NetworkManager"
+		else
+			echo "Restarting NetworkManager..."
+			if ! sudo systemctl restart network-manager 2>/dev/null
 			then
-				echo "** Failed to restart NetworkManager: network may not be functional! **"
+				if ! sudo systemctl restart NetworkManager 2>/dev/null
+				then
+					echo "** Failed to restart NetworkManager: network may not be functional! **"
+				fi
 			fi
 		fi
 	fi

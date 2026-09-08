@@ -9,7 +9,10 @@ multicast strategy reverse engineered by kueblc
 
 from crc import crc_32
 
-from Cryptodome.Cipher import AES
+try:
+	from Cryptodome.Cipher import AES
+except ImportError:  # some distributions package pycryptodome as "Crypto"
+	from Crypto.Cipher import AES
 pad = lambda data, block_size : data + ('\0' * ( (block_size - len(data)) % block_size ) )
 aes = AES.new( b'a3c6794oiu876t54', AES.MODE_ECB )
 encrypt = lambda data : aes.encrypt( pad(data, 16).encode() )

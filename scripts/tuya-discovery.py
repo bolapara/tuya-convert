@@ -9,7 +9,10 @@ Discover Tuya devices on the LAN via UDP broadcast
 import asyncio
 import json
 
-from Cryptodome.Cipher import AES
+try:
+	from Cryptodome.Cipher import AES
+except ImportError:  # some distributions package pycryptodome as "Crypto"
+	from Crypto.Cipher import AES
 pad = lambda s: s + (16 - len(s) % 16) * chr(16 - len(s) % 16)
 unpad = lambda s: s[:-ord(s[len(s) - 1:])]
 encrypt = lambda msg, key: AES.new(key, AES.MODE_ECB).encrypt(pad(msg).encode())
@@ -47,7 +50,13 @@ class TuyaDiscovery(asyncio.DatagramProtocol):
 			pass
 
 def main():
-	loop = asyncio.get_event_loop()
+	# Patched: asyncio.get_event_loop() no longer creates a loop implicitly on
+	# Python 3.12+, it raises RuntimeError. Create one explicitly instead.
+	try:
+		loop = asyncio.get_running_loop()
+	except RuntimeError:
+		loop = asyncio.new_event_loop()
+		asyncio.set_event_loop(loop)
 	listener = loop.create_datagram_endpoint(TuyaDiscovery, local_addr=('0.0.0.0', 6666))
 	encrypted_listener = loop.create_datagram_endpoint(TuyaDiscovery, local_addr=('0.0.0.0', 6667))
 	loop.run_until_complete(listener)

@@ -4,7 +4,7 @@ normal=$(tput sgr0)
 . ./config.txt
 
 setup () {
-	echo "tuya-convert $(git describe --tags)"
+	echo "tuya-convert $(git describe --tags 2>/dev/null || echo 'master (tarball)')"
 	pushd scripts >/dev/null || exit
 	. ./setup_checks.sh
 	screen_minor=$(screen --version | cut -d . -f 2)
@@ -24,7 +24,16 @@ setup () {
 	echo "  Starting web server in a screen"
 	$screen_with_log smarthack-web.log -S smarthack-web -m -d ./fake-registration-server.py
 	echo "  Starting Mosquitto in a screen"
-	$screen_with_log smarthack-mqtt.log -S smarthack-mqtt -m -d mosquitto -v -c $PWD/mosquitto.conf
+	# Some distributions (Ubuntu among them) ship an AppArmor profile that
+	# confines mosquitto to reading configuration from /etc/mosquitto/ only,
+	# so it cannot load the copy that lives in this repository. Install our
+	# config there when we can, and otherwise fall back to the local copy for
+	# systems where no such confinement applies.
+	mosquitto_conf="$PWD/mosquitto.conf"
+	if [ -d /etc/mosquitto ] && sudo install -m 644 mosquitto.conf /etc/mosquitto/tuya-convert.conf 2>/dev/null; then
+		mosquitto_conf=/etc/mosquitto/tuya-convert.conf
+	fi
+	$screen_with_log smarthack-mqtt.log -S smarthack-mqtt -m -d mosquitto -v -c "$mosquitto_conf"
 	echo "  Starting PSK frontend in a screen"
 	$screen_with_log smarthack-psk.log -S smarthack-psk -m -d ./psk-frontend.py -v
 	echo "  Starting Tuya Discovery in a screen"

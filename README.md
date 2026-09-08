@@ -1,6 +1,48 @@
 ﻿
 # TUYA-CONVERT
 
+## ABOUT THIS FORK
+
+This fork updates tuya-convert to run on current Linux distributions (tested on
+Ubuntu 26.04 with Python 3.14 and OpenSSL 3.5). Upstream fails on such systems
+before it ever reaches the device. The functional changes:
+
+* **Dropped the `sslpsk` dependency.** Upstream builds the `sslpsk` C extension
+  from a repository last released in 2019; it no longer compiles against modern
+  Python. `psk-frontend.py` now calls OpenSSL's PSK API directly through
+  `ctypes`, which needs no compiler and no third-party TLS package.
+
+  Note that Python 3.13's new built-in TLS-PSK support is *not* a usable
+  replacement here: CPython decodes the client's PSK identity as UTF-8 before
+  invoking the callback, and silently skips the callback when that fails.
+  Tuya devices send identities containing raw binary bytes, so the handshake
+  always aborts with `PSK_IDENTITY_NOT_FOUND`. The `ctypes` binding receives
+  the identity as raw bytes, as `sslpsk` did.
+
+* **Python dependencies come from the distribution, not pip.** Recent releases
+  mark the system Python environment as externally managed (PEP 668), which
+  makes `install_prereq.sh`'s `pip install` fail outright.
+
+* **`asyncio` fix in `tuya-discovery.py`.** `asyncio.get_event_loop()` no longer
+  creates a loop implicitly, so discovery crashed on startup.
+
+* **Mosquitto config location.** Distributions such as Ubuntu ship an AppArmor
+  profile confining mosquitto to reading configuration from `/etc/mosquitto/`,
+  so it could not load the copy inside the repository. The config is now
+  installed there when required, with a fallback to the in-repo copy.
+
+* **Only the wireless interface is taken from NetworkManager**, using
+  `nmcli device set <iface> managed no`, instead of stopping the service
+  entirely. Stopping NetworkManager also drops wired connections, which on a
+  desktop is usually the machine's only route to the internet. Falls back to
+  the previous behaviour where `nmcli` is unavailable.
+
+The PSK identity is now logged in full, and a device whose identity begins with
+`02` — indicating patched firmware that cannot be flashed — is called out
+explicitly.
+
+---
+
 A Chinese company named Tuya offers a free-to-brand turnkey smart home solution to anyone. Using their offer is dead-simple, since everything can be done by clicking through the [Tuya web page](https://en.tuya.com/), from choosing your pre-designed products or pre-programmed wifi-modules (mostly ESP8266) to building your own app. In the end, this has resulted in as they claim over 11 000 devices 'made' by over 10 000 vendors using Tuyas firmware and cloud services.
 
 Aside from that, they claim their cloud solution has 'military grade security'. Michael Steigerwald, founder of the German IT security startup VTRUST, was able to disprove this claim and presented his results in the "Smart home - Smart hack" talk at 35C3 in Leipzig: https://media.ccc.de/v/35c3-9723-smart_home_-_smart_hack
