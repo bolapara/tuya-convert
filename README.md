@@ -3,6 +3,8 @@
 
 ## ABOUT THIS FORK
 
+### Full disclosure; all the work done on this fork was done by Claude.
+
 This fork updates tuya-convert to run on current Linux distributions (tested on
 Ubuntu 26.04 with Python 3.14 and OpenSSL 3.5). Upstream fails on such systems
 before it ever reaches the device. The functional changes:
